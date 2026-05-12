@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Editor PDF · Igarapé Digital</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- PDF.js (render) e PDF-lib (gerar) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+
+<style>
+  :root{
+    --bg:        #F5F2EC;
+    --paper:     #FFFFFF;
+    --ink:       #1C1C1C;
+    --ink-soft:  #5A5A56;
+    --line:      #D4CFC4;
+    --line-soft: #E8E3D8;
+    --accent:    #1B4D3E;       /* verde igarapé */
+    --accent-2:  #B85C00;       /* âmbar editor */
+    --danger:    #8C2814;
+    --shadow:    0 1px 0 rgba(0,0,0,.04), 0 8px 24px -12px rgba(28,28,28,.18);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',system-ui,sans-serif;
+    font-size:14px;
+    line-height:1.45;
+    display:grid;
+    grid-template-rows:auto 1fr auto;
+    overflow:hidden;
+  }
+
+  /* HEADER */
+  header.app{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 22px;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{
+    display:flex;align-items:baseline;gap:14px;
+  }
+  .brand h1{
+    margin:0;
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:22px;
+    letter-spacing:-.01em;
+  }
+  .brand h1 .dot{color:var(--accent)}
+  .brand small{
+    color:var(--ink-soft);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.18em;
+  }
+
+  .toolbar{display:flex;gap:8px;align-items:center}
+  .btn{
+    appearance:none;border:1px solid var(--line);background:var(--paper);color:var(--ink);
+    padding:8px 14px;font:inherit;font-size:13px;font-weight:500;
+    border-radius:2px;cursor:pointer;
+    transition:transform .08s, background .15s, border-color .15s;
+  }
+  .btn:hover{border-color:var(--ink);}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#143a2e;border-color:#143a2e}
+  .btn.ghost{background:transparent}
+  .btn.danger{color:var(--danger);border-color:var(--line)}
+  .btn.danger:hover{border-color:var(--danger)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* MAIN */
+  main{
+    display:grid;
+    grid-template-columns:300px 1fr;
+    overflow:hidden;
+  }
+
+  /* SIDEBAR */
+  aside.sidebar{
+    background:var(--paper);
+    border-right:1px solid var(--line);
+    overflow-y:auto;
+    display:flex;flex-direction:column;
+  }
+  .panel{padding:18px 20px;border-bottom:1px solid var(--line-soft)}
+  .panel h2{
+    margin:0 0 12px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    font-weight:500;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .field{margin-bottom:10px}
+  .field label{
+    display:block;
+    font-size:11px;color:var(--ink-soft);
+    margin-bottom:4px;
+    font-family:'JetBrains Mono',monospace;
+    letter-spacing:.05em;
+  }
+  .field input[type="text"],
+  .field textarea,
+  .field input[type="number"]{
+    width:100%;
+    padding:7px 9px;border:1px solid var(--line);background:#fff;
+    font:inherit;font-size:13px;color:var(--ink);
+    border-radius:2px;outline:none;
+    transition:border-color .15s;
+  }
+  .field textarea{resize:vertical;min-height:62px;font-family:'IBM Plex Sans',sans-serif}
+  .field input:focus,.field textarea:focus{border-color:var(--accent)}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1}
+
+  .color-row{display:flex;align-items:center;gap:8px}
+  .color-row input[type="color"]{
+    width:34px;height:30px;padding:0;border:1px solid var(--line);background:none;cursor:pointer;
+    border-radius:2px;
+  }
+  .color-row .swatch-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft)}
+
+  .edit-list{display:flex;flex-direction:column;gap:6px}
+  .edit-item{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 10px;border:1px solid var(--line);background:#fff;
+    cursor:pointer;border-radius:2px;
+    transition:border-color .15s, background .15s;
+  }
+  .edit-item:hover{border-color:var(--ink)}
+  .edit-item.active{border-color:var(--accent-2);background:#FFF5EA}
+  .edit-item .marker{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;color:var(--accent-2);
+    min-width:32px;
+  }
+  .edit-item .label{flex:1;font-size:12px;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .edit-item .page-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;color:var(--ink-soft);
+  }
+
+  .empty-list{
+    font-size:12px;color:var(--ink-soft);font-style:italic;
+    padding:14px 4px;
+  }
+
+  /* CANVAS AREA */
+  section.viewer{
+    overflow:auto;
+    padding:30px;
+    background:repeating-linear-gradient(
+      45deg,
+      transparent 0 12px,
+      rgba(28,28,28,.012) 12px 13px
+    ),var(--bg);
+    display:flex;flex-direction:column;align-items:center;
+    gap:24px;
+  }
+  .dropzone{
+    border:2px dashed var(--line);
+    border-radius:4px;
+    padding:80px 60px;
+    text-align:center;
+    background:var(--paper);
+    color:var(--ink-soft);
+    max-width:560px;
+    margin:auto;
+    cursor:pointer;
+    transition:border-color .2s, background .2s;
+  }
+  .dropzone.drag{border-color:var(--accent);background:#EFEEE7}
+  .dropzone h3{
+    font-family:'Fraunces',serif;font-weight:500;font-size:24px;
+    margin:0 0 10px;color:var(--ink);
+  }
+  .dropzone p{margin:6px 0;font-size:13px}
+  .dropzone .hint{
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    letter-spacing:.15em;text-transform:uppercase;margin-top:18px;
+  }
+
+  .page-wrap{
+    position:relative;
+    background:#fff;
+    box-shadow:var(--shadow);
+    border:1px solid var(--line);
+  }
+  .page-wrap canvas{display:block}
+  .overlay{
+    position:absolute;inset:0;
+    cursor:crosshair;
+  }
+
+  .edit-box{
+    position:absolute;
+    border:1px dashed var(--accent-2);
+    background:rgba(255,255,255,.0);
+    cursor:move;
+    overflow:visible;
+    box-sizing:border-box;
+  }
+  .edit-box.selected{
+    border:1px solid var(--accent-2);
+    box-shadow:0 0 0 2px rgba(184,92,0,.18);
+  }
+  .edit-box .text{
+    width:100%;height:100%;
+    padding:1px 2px;
+    border:none;background:transparent;
+    font-family:'Helvetica',Arial,sans-serif;
+    color:#000;line-height:1.15;
+    outline:none;resize:none;
+    cursor:text;
+    overflow:hidden;
+    white-space:pre;
+    box-sizing:border-box;
+  }
+  .edit-box .handle{
+    position:absolute;width:10px;height:10px;
+    background:var(--accent-2);border:1px solid #fff;
+    border-radius:50%;
+  }
+  .edit-box .handle.se{right:-6px;bottom:-6px;cursor:nwse-resize}
+  .edit-box .num{
+    position:absolute;top:-18px;left:-1px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;color:var(--accent-2);
+    background:var(--paper);padding:1px 4px;border:1px solid var(--accent-2);
+    pointer-events:none;
+  }
+
+  .page-info{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;color:var(--ink-soft);
+    text-align:center;
+    margin-top:-12px;
+  }
+
+  /* FOOTER */
+  footer.app{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:8px 22px;
+    background:var(--paper);
+    border-top:1px solid var(--line);
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    color:var(--ink-soft);
+    letter-spacing:.12em;
+    text-transform:uppercase;
+  }
+  footer.app .left{display:flex;gap:18px;align-items:center}
+  .zoom-controls{display:flex;align-items:center;gap:4px}
+  .zoom-controls button{
+    background:transparent;border:1px solid var(--line);
+    width:24px;height:24px;cursor:pointer;color:var(--ink);
+    font-family:'JetBrains Mono',monospace;font-size:14px;
+    border-radius:2px;
+  }
+  .zoom-controls button:hover{border-color:var(--ink)}
+  .zoom-value{min-width:46px;text-align:center}
+
+  /* TOAST */
+  .toast{
+    position:fixed;bottom:48px;right:22px;
+    background:var(--ink);color:#fff;padding:10px 14px;
+    font-size:12px;border-radius:2px;
+    box-shadow:var(--shadow);
+    opacity:0;transform:translateY(8px);
+    pointer-events:none;
+    transition:opacity .25s, transform .25s;
+    z-index:9999;
+  }
+  .toast.show{opacity:1;transform:translateY(0)}
+  .toast.error{background:var(--danger)}
+
+  .help-hint{
+    font-size:12px;color:var(--ink-soft);
+    background:#FBF8F1;border:1px solid var(--line-soft);
+    padding:10px 12px;border-radius:2px;
+    line-height:1.5;
+  }
+  .help-hint kbd{
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    background:#fff;border:1px solid var(--line);padding:1px 5px;border-radius:2px;
+  }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="brand">
+    <h1>Editor PDF<span class="dot">.</span></h1>
+    <small>Igarapé Digital</small>
+  </div>
+  <div class="toolbar">
+    <input type="file" id="fileInput" accept="application/pdf" hidden />
+    <button class="btn ghost" id="btnImport">Importar PDF</button>
+    <button class="btn primary" id="btnExport" disabled>Exportar PDF</button>
+  </div>
+</header>
+
+<main>
+  <aside class="sidebar">
+
+    <div class="panel">
+      <h2>Edições</h2>
+      <div id="editList" class="edit-list">
+        <div class="empty-list">Nenhuma edição. Clique sobre o PDF para criar.</div>
+      </div>
+    </div>
+
+    <div class="panel" id="propsPanel" style="display:none">
+      <h2>Propriedades</h2>
+
+      <div class="field">
+        <label>Texto</label>
+        <textarea id="propText" rows="3" placeholder="Digite o texto novo..."></textarea>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Fonte (pt)</label>
+          <input type="number" id="propFontSize" min="4" max="72" step="0.5" />
+        </div>
+        <div class="field">
+          <label>Largura (px)</label>
+          <input type="number" id="propWidth" min="20" step="1" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>X</label>
+          <input type="number" id="propX" step="1" />
+        </div>
+        <div class="field">
+          <label>Y</label>
+          <input type="number" id="propY" step="1" />
+        </div>
+        <div class="field">
+          <label>Altura</label>
+          <input type="number" id="propHeight" min="10" step="1" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cor do texto</label>
+        <div class="color-row">
+          <input type="color" id="propTextColor" value="#000000" />
+          <span class="swatch-label" id="propTextColorVal">#000000</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cobertura (fundo)</label>
+        <div class="color-row">
+          <input type="color" id="propBgColor" value="#FFFFFF" />
+          <span class="swatch-label" id="propBgColorVal">#FFFFFF</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Opacidade da cobertura</label>
+        <input type="number" id="propBgOpacity" min="0" max="1" step="0.05" value="1" />
+      </div>
+
+      <button class="btn danger" id="btnDelete" style="width:100%;margin-top:6px">Excluir edição</button>
+    </div>
+
+    <div class="panel">
+      <div class="help-hint">
+        <strong>Como usar:</strong><br>
+        1. Importe o PDF.<br>
+        2. Clique sobre o campo a editar — uma caixa será criada.<br>
+        3. Digite o texto novo na caixa (ou no painel ao lado).<br>
+        4. Arraste para mover, alça <span style="color:var(--accent-2)">●</span> para redimensionar.<br>
+        5. <kbd>Delete</kbd> remove a caixa selecionada.<br>
+        6. Exporte para baixar o PDF editado.
+      </div>
+    </div>
+
+  </aside>
+
+  <section class="viewer" id="viewer">
+    <div class="dropzone" id="dropzone">
+      <h3>Importe um PDF para começar</h3>
+      <p>Arraste o arquivo aqui ou clique para selecionar</p>
+      <p class="hint">.pdf · até 50 MB</p>
+    </div>
+  </section>
+</main>
+
+<footer class="app">
+  <div class="left">
+    <span id="fileName">Nenhum arquivo</span>
+    <span id="editsCount">0 edições</span>
+  </div>
+  <div class="zoom-controls">
+    <span>Zoom</span>
+    <button id="zoomOut">−</button>
+    <span class="zoom-value" id="zoomValue">150%</span>
+    <button id="zoomIn">+</button>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   STATE
+========================================================================= */
+const state = {
+  pdfDoc: null,
+  originalBytes: null,
+  fileName: null,
+  totalPages: 0,
+  zoom: 1.5,
+  edits: [],
+  selectedId: null,
+  pageMeta: [],          // [{pdfWidth, pdfHeight, canvasWidth, canvasHeight}]
+  nextId: 1,
+};
+
+/* =========================================================================
+   PDF.js worker
+========================================================================= */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* =========================================================================
+   ELEMENTS
+========================================================================= */
+const $ = id => document.getElementById(id);
+const viewer    = $('viewer');
+const dropzone  = $('dropzone');
+const fileInput = $('fileInput');
+const btnImport = $('btnImport');
+const btnExport = $('btnExport');
+const editList  = $('editList');
+const propsPanel = $('propsPanel');
+const fileNameEl = $('fileName');
+const editsCountEl = $('editsCount');
+const zoomValue = $('zoomValue');
+const toast = $('toast');
+
+const propText   = $('propText');
+const propFont   = $('propFontSize');
+const propW      = $('propWidth');
+const propH      = $('propHeight');
+const propX      = $('propX');
+const propY      = $('propY');
+const propTC     = $('propTextColor');
+const propTCV    = $('propTextColorVal');
+const propBC     = $('propBgColor');
+const propBCV    = $('propBgColorVal');
+const propBO     = $('propBgOpacity');
+const btnDelete  = $('btnDelete');
+
+/* =========================================================================
+   UTIL
+========================================================================= */
+function toastMsg(msg, isError){
+  toast.textContent = msg;
+  toast.classList.toggle('error', !!isError);
+  toast.classList.add('show');
+  clearTimeout(toastMsg._t);
+  toastMsg._t = setTimeout(()=>toast.classList.remove('show'), 2400);
+}
+function hexToRgb01(hex){
+  const m = hex.replace('#','');
+  const r = parseInt(m.slice(0,2),16)/255;
+  const g = parseInt(m.slice(2,4),16)/255;
+  const b = parseInt(m.slice(4,6),16)/255;
+  return [r,g,b];
+}
+
+/* =========================================================================
+   FILE LOAD
+========================================================================= */
+btnImport.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('click', () => fileInput.click());
+
+['dragenter','dragover'].forEach(ev =>
+  dropzone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    dropzone.classList.add('drag');
+  })
+);
+['dragleave','drop'].forEach(ev =>
+  dropzone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    dropzone.classList.remove('drag');
+  })
+);
+dropzone.addEventListener('drop', e => {
+  const f = e.dataTransfer.files?.[0];
+  if (f) loadFile(f);
+});
+fileInput.addEventListener('change', e => {
+  const f = e.target.files?.[0];
+  if (f) loadFile(f);
+});
+
+async function loadFile(file){
+  if (file.type !== 'application/pdf') {
+    toastMsg('O arquivo precisa ser PDF.', true); return;
+  }
+  try {
+    const buf = await file.arrayBuffer();
+    state.originalBytes = new Uint8Array(buf);
+    state.fileName = file.name;
+    state.edits = [];
+    state.selectedId = null;
+    state.pageMeta = [];
+
+    // PDF.js precisa de uma cópia (load consome o buffer)
+    const loadingTask = pdfjsLib.getDocument({ data: state.originalBytes.slice() });
+    state.pdfDoc = await loadingTask.promise;
+    state.totalPages = state.pdfDoc.numPages;
+
+    fileNameEl.textContent = file.name;
+    btnExport.disabled = false;
+
+    await renderAllPages();
+    refreshEditList();
+    refreshPropsPanel();
+    toastMsg('PDF carregado.');
+  } catch (err){
+    console.error(err);
+    toastMsg('Falha ao carregar o PDF.', true);
+  }
+}
+
+/* =========================================================================
+   RENDER
+========================================================================= */
+async function renderAllPages(){
+  // limpa viewer
+  viewer.innerHTML = '';
+  state.pageMeta = [];
+
+  for (let p=1; p<=state.totalPages; p++){
+    const page = await state.pdfDoc.getPage(p);
+    const viewport = page.getViewport({ scale: state.zoom });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'page-wrap';
+    wrap.dataset.page = p;
+    wrap.style.width  = viewport.width + 'px';
+    wrap.style.height = viewport.height + 'px';
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = viewport.width;
+    canvas.height = viewport.height;
+    canvas.dataset.page = p;
+    wrap.appendChild(canvas);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.dataset.page = p;
+    overlay.addEventListener('mousedown', onOverlayMouseDown);
+    wrap.appendChild(overlay);
+
+    viewer.appendChild(wrap);
+
+    const info = document.createElement('div');
+    info.className = 'page-info';
+    info.textContent = `Página ${p} de ${state.totalPages}  ·  ${Math.round(viewport.width/state.zoom)} × ${Math.round(viewport.height/state.zoom)} pt`;
+    viewer.appendChild(info);
+
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    // Salva dimensões da página em pontos PDF
+    const baseViewport = page.getViewport({ scale: 1 });
+    state.pageMeta[p-1] = {
+      pdfWidth:  baseViewport.width,
+      pdfHeight: baseViewport.height,
+      canvasWidth: viewport.width,
+      canvasHeight: viewport.height,
+    };
+  }
+
+  // re-renderiza edições existentes (caso de rezoom)
+  state.edits.forEach(renderEditBox);
+}
+
+/* =========================================================================
+   EDITS
+========================================================================= */
+function onOverlayMouseDown(e){
+  // só cria caixa nova se o clique foi DIRETO no overlay (não numa edição existente)
+  if (e.target !== e.currentTarget) return;
+  const overlay = e.currentTarget;
+  const page = parseInt(overlay.dataset.page,10);
+  const rect = overlay.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const defaultW = 160, defaultH = 18;
+  const edit = {
+    id: 'edit-' + (state.nextId++),
+    page,
+    x: Math.max(0, x - 4),
+    y: Math.max(0, y - 4),
+    width: defaultW,
+    height: defaultH,
+    text: '',
+    fontSize: 10,         // em pontos PDF
+    textColor: '#000000',
+    bgColor: '#FFFFFF',
+    bgOpacity: 1,
+  };
+  state.edits.push(edit);
+  renderEditBox(edit);
+  selectEdit(edit.id);
+  refreshEditList();
+}
+
+function renderEditBox(edit){
+  const overlay = document.querySelector(`.overlay[data-page="${edit.page}"]`);
+  if (!overlay) return;
+
+  let box = overlay.querySelector(`[data-edit-id="${edit.id}"]`);
+  if (!box){
+    box = document.createElement('div');
+    box.className = 'edit-box';
+    box.dataset.editId = edit.id;
+
+    const num = document.createElement('div');
+    num.className = 'num';
+    box.appendChild(num);
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'text';
+    textarea.spellcheck = false;
+    box.appendChild(textarea);
+
+    const handle = document.createElement('div');
+    handle.className = 'handle se';
+    box.appendChild(handle);
+
+    overlay.appendChild(box);
+
+    // eventos
+    box.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('text')) return;
+      if (e.target.classList.contains('handle')) {
+        startResize(e, edit.id);
+      } else {
+        startDrag(e, edit.id);
+      }
+      e.stopPropagation();
+    });
+    textarea.addEventListener('focus', () => selectEdit(edit.id));
+    textarea.addEventListener('input', e => {
+      const ed = findEdit(edit.id); if (!ed) return;
+      ed.text = e.target.value;
+      if (state.selectedId === ed.id) propText.value = ed.text;
+      refreshEditList();
+    });
+  }
+
+  // estilo / valores
+  box.style.left   = edit.x + 'px';
+  box.style.top    = edit.y + 'px';
+  box.style.width  = edit.width + 'px';
+  box.style.height = edit.height + 'px';
+  box.style.background = hexWithAlpha(edit.bgColor, edit.bgOpacity);
+
+  const ta = box.querySelector('.text');
+  ta.value = edit.text;
+  ta.style.color = edit.textColor;
+  // px no canvas = fontSize_pt * zoom
+  ta.style.fontSize = (edit.fontSize * state.zoom) + 'px';
+
+  const num = box.querySelector('.num');
+  num.textContent = '#' + edit.id.replace('edit-','');
+
+  box.classList.toggle('selected', state.selectedId === edit.id);
+}
+
+function hexWithAlpha(hex, a){
+  const [r,g,b] = hexToRgb01(hex).map(v=>Math.round(v*255));
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function findEdit(id){ return state.edits.find(e=>e.id===id); }
+
+function selectEdit(id){
+  state.selectedId = id;
+  document.querySelectorAll('.edit-box').forEach(b => {
+    b.classList.toggle('selected', b.dataset.editId === id);
+  });
+  refreshEditList();
+  refreshPropsPanel();
+}
+
+function deleteEdit(id){
+  const idx = state.edits.findIndex(e=>e.id===id);
+  if (idx<0) return;
+  const ed = state.edits[idx];
+  const box = document.querySelector(`[data-edit-id="${id}"]`);
+  if (box) box.remove();
+  state.edits.splice(idx,1);
+  if (state.selectedId === id) state.selectedId = null;
+  refreshEditList();
+  refreshPropsPanel();
+}
+
+/* ---- drag / resize ---- */
+let dragData = null;
+function startDrag(e, id){
+  const edit = findEdit(id); if (!edit) return;
+  dragData = { mode:'move', id, startX:e.clientX, startY:e.clientY, ox:edit.x, oy:edit.y };
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', endDrag);
+}
+function startResize(e, id){
+  const edit = findEdit(id); if (!edit) return;
+  dragData = { mode:'resize', id, startX:e.clientX, startY:e.clientY, ow:edit.width, oh:edit.height };
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', endDrag);
+}
+function onMouseMove(e){
+  if (!dragData) return;
+  const dx = e.clientX - dragData.startX;
+  const dy = e.clientY - dragData.startY;
+  const edit = findEdit(dragData.id); if (!edit) return;
+  if (dragData.mode === 'move'){
+    edit.x = Math.max(0, dragData.ox + dx);
+    edit.y = Math.max(0, dragData.oy + dy);
+  } else {
+    edit.width  = Math.max(20, dragData.ow + dx);
+    edit.height = Math.max(10, dragData.oh + dy);
+  }
+  renderEditBox(edit);
+  if (state.selectedId === edit.id) refreshPropsPanel(true);
+}
+function endDrag(){
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup', endDrag);
+  dragData = null;
+}
+
+/* =========================================================================
+   SIDEBAR PANELS
+========================================================================= */
+function refreshEditList(){
+  editsCountEl.textContent = state.edits.length + (state.edits.length===1?' edição':' edições');
+  if (state.edits.length === 0){
+    editList.innerHTML = '<div class="empty-list">Nenhuma edição. Clique sobre o PDF para criar.</div>';
+    return;
+  }
+  editList.innerHTML = '';
+  state.edits.forEach(ed => {
+    const item = document.createElement('div');
+    item.className = 'edit-item' + (ed.id===state.selectedId?' active':'');
+    item.innerHTML = `
+      <span class="marker">#${ed.id.replace('edit-','')}</span>
+      <span class="label">${escapeHtml(ed.text || '(vazio)')}</span>
+      <span class="page-tag">p.${ed.page}</span>
+    `;
+    item.addEventListener('click', () => selectEdit(ed.id));
+    editList.appendChild(item);
+  });
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function refreshPropsPanel(skipText){
+  const ed = findEdit(state.selectedId);
+  if (!ed){ propsPanel.style.display='none'; return; }
+  propsPanel.style.display = 'block';
+  if (!skipText) propText.value = ed.text;
+  propFont.value = ed.fontSize;
+  propW.value = Math.round(ed.width);
+  propH.value = Math.round(ed.height);
+  propX.value = Math.round(ed.x);
+  propY.value = Math.round(ed.y);
+  propTC.value = ed.textColor;
+  propTCV.textContent = ed.textColor.toUpperCase();
+  propBC.value = ed.bgColor;
+  propBCV.textContent = ed.bgColor.toUpperCase();
+  propBO.value = ed.bgOpacity;
+}
+
+/* listeners do painel */
+propText.addEventListener('input', e => {
+  const ed = findEdit(state.selectedId); if (!ed) return;
+  ed.text = e.target.value;
+  renderEditBox(ed);
+  refreshEditList();
+});
+propFont.addEventListener('input', e => {
+  const ed = findEdit(state.selectedId); if (!ed) return;
+  ed.fontSize = Math.max(4, parseFloat(e.target.value)||10);
+  renderEditBox(ed);
+});
+function bindNum(input, prop){
+  input.addEventListener('input', e => {
+    const ed = findEdit(state.selectedId); if (!ed) return;
+    const v = parseFloat(e.target.value)||0;
+    ed[prop] = (prop==='width'||prop==='height') ? Math.max(prop==='width'?20:10, v) : Math.max(0, v);
+    renderEditBox(ed);
+  });
+}
+bindNum(propW, 'width');
+bindNum(propH, 'height');
+bindNum(propX, 'x');
+bindNum(propY, 'y');
+
+propTC.addEventListener('input', e => {
+  const ed = findEdit(state.selectedId); if (!ed) return;
+  ed.textColor = e.target.value;
+  propTCV.textContent = ed.textColor.toUpperCase();
+  renderEditBox(ed);
+});
+propBC.addEventListener('input', e => {
+  const ed = findEdit(state.selectedId); if (!ed) return;
+  ed.bgColor = e.target.value;
+  propBCV.textContent = ed.bgColor.toUpperCase();
+  renderEditBox(ed);
+});
+propBO.addEventListener('input', e => {
+  const ed = findEdit(state.selectedId); if (!ed) return;
+  ed.bgOpacity = Math.min(1, Math.max(0, parseFloat(e.target.value)||0));
+  renderEditBox(ed);
+});
+btnDelete.addEventListener('click', () => {
+  if (state.selectedId) deleteEdit(state.selectedId);
+});
+
+/* tecla delete */
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Delete' || e.key === 'Backspace') &&
+      state.selectedId &&
+      document.activeElement &&
+      !['TEXTAREA','INPUT'].includes(document.activeElement.tagName)){
+    deleteEdit(state.selectedId);
+    e.preventDefault();
+  }
+});
+
+/* =========================================================================
+   ZOOM
+========================================================================= */
+$('zoomIn').addEventListener('click', () => changeZoom(+0.25));
+$('zoomOut').addEventListener('click', () => changeZoom(-0.25));
+async function changeZoom(delta){
+  if (!state.pdfDoc) return;
+  const nz = Math.min(3, Math.max(0.5, state.zoom + delta));
+  if (nz === state.zoom) return;
+  const factor = nz / state.zoom;
+  state.zoom = nz;
+  zoomValue.textContent = Math.round(state.zoom*100) + '%';
+  // re-escala edições para acompanhar
+  state.edits.forEach(ed => {
+    ed.x *= factor; ed.y *= factor;
+    ed.width *= factor; ed.height *= factor;
+  });
+  await renderAllPages();
+  refreshPropsPanel();
+}
+
+/* =========================================================================
+   EXPORT (PDF-lib)
+========================================================================= */
+btnExport.addEventListener('click', async () => {
+  if (!state.originalBytes) return;
+  try {
+    btnExport.disabled = true;
+    btnExport.textContent = 'Gerando...';
+
+    const { PDFDocument, StandardFonts, rgb } = PDFLib;
+    const pdfDoc = await PDFDocument.load(state.originalBytes);
+    const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const helvBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const pages = pdfDoc.getPages();
+
+    for (const ed of state.edits){
+      const page = pages[ed.page - 1];
+      const meta = state.pageMeta[ed.page - 1];
+      if (!page || !meta) continue;
+
+      // converter canvas-px → pdf-pt
+      const sx = meta.pdfWidth  / meta.canvasWidth;
+      const sy = meta.pdfHeight / meta.canvasHeight;
+
+      const xPdf = ed.x * sx;
+      const wPdf = ed.width  * sx;
+      const hPdf = ed.height * sy;
+      // PDF: origem bottom-left
+      const yPdf = meta.pdfHeight - (ed.y * sy) - hPdf;
+
+      // 1) cobertura (fundo) — desenha mesmo se opacidade = 0 ? Não.
+      if (ed.bgOpacity > 0){
+        const [br,bg,bb] = hexToRgb01(ed.bgColor);
+        page.drawRectangle({
+          x: xPdf,
+          y: yPdf,
+          width: wPdf,
+          height: hPdf,
+          color: rgb(br,bg,bb),
+          opacity: ed.bgOpacity,
+          borderWidth: 0,
+        });
+      }
+
+      // 2) texto (pode ter múltiplas linhas)
+      if (ed.text && ed.text.length){
+        const [tr,tg,tb] = hexToRgb01(ed.textColor);
+        const lines = ed.text.split('\n');
+        const lineHeight = ed.fontSize * 1.15;
+        lines.forEach((line, i) => {
+          const yLine = yPdf + hPdf - (i+1)*lineHeight + (lineHeight - ed.fontSize)*0.25;
+          page.drawText(line, {
+            x: xPdf + 2,
+            y: yLine,
+            size: ed.fontSize,
+            font: helv,
+            color: rgb(tr,tg,tb),
+          });
+        });
+      }
+    }
+
+    const bytes = await pdfDoc.save();
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const baseName = state.fileName.replace(/\.pdf$/i,'');
+    a.href = url;
+    a.download = baseName + '_editado.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toastMsg('PDF exportado.');
+  } catch (err){
+    console.error(err);
+    toastMsg('Erro ao exportar.', true);
+  } finally {
+    btnExport.disabled = false;
+    btnExport.textContent = 'Exportar PDF';
+  }
+});
+</script>
+
+</body>
+</html>
